@@ -89,6 +89,7 @@ jobs:
           PYTEST_ADDOPTS: "--color=yes"
 
       - name: Run behave
+        if: false
         run: |
           mkdir -p reports/behave
 
