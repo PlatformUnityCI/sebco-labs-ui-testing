@@ -68,9 +68,6 @@ jobs:
       - name: Configure Python Path
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
-      - name: Export OpenAPI spec
-        run: python scripts/export_openapi.py
-
       - name: Run tests
         run: |
           mkdir -p reports
