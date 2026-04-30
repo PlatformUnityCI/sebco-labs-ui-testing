@@ -118,9 +118,3 @@ jobs:
         with:
           name: test-report
           path: reports
-        
-      - name: Upload Swagger
-        uses: actions/upload-artifact@v7
-        with:
-          name: swagger-docs
-          path: docs/swagger
