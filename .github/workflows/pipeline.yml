@@ -1,0 +1,129 @@
+name: CLI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches: [ "main" ]
+    types: [ opened, synchronize, reopened ]
+  schedule:
+    - cron: '30 21 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      qa_tag:
+        description: 'QA tag to run tests'
+        default: regression
+        required: true
+
+concurrency:
+  group: qa-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  issues: write
+  actions: read
+
+env:
+  SECRET_PASSWORD: ${{ secrets.SECRET_PASSWORD }}
+  SECRET_PASSWORD_ERROR: ${{ secrets.SECRET_PASSWORD_ERROR }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DEFAULT_QA_TAG: 'regression'
+
+    steps:
+      - name: Debug info
+        run: |
+          echo "GitHub event: ${{ github.event_name }}"
+          echo "Head ref: ${{ github.head_ref }}"
+          echo "Base ref: ${{ github.base_ref }}"
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.12.0
+
+      - name: Cache pip
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -I
+
+      - name: Configure Python Path
+        run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+
+      - name: Export OpenAPI spec
+        run: python scripts/export_openapi.py
+
+      - name: Run tests
+        run: |
+          mkdir -p reports
+
+          QA_TAG="${{ inputs.qa_tag }}"
+          if [ -z "$QA_TAG" ]; then
+            QA_TAG="$DEFAULT_QA_TAG"
+          fi
+          
+          echo "Running tests with mark: $QA_TAG"
+
+          pytest -m "$QA_TAG" -v \
+            --maxfail=1 \
+            --disable-warnings \
+            --junitxml=reports/junit.xml \
+            --html=reports/html-report.html \
+            --self-contained-html
+        env:
+          PYTEST_ADDOPTS: "--color=yes"
+
+      - name: Run behave
+        run: |
+          mkdir -p reports/behave
+
+          QA_TAG="${{ inputs.qa_tag }}"
+          if [ -z "$QA_TAG" ]; then
+            QA_TAG="$DEFAULT_QA_TAG"
+          fi
+
+          echo "Running behave with tag: @$QA_TAG"
+
+          behave \
+            --tags="@$QA_TAG" \
+            --junit \
+            --junit-directory reports/behave \
+            -f behave_html_formatter:HTMLFormatter \
+            -o reports/behave/report.html
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: reports/junit.xml
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-report
+          path: reports
+        
+      - name: Upload Swagger
+        uses: actions/upload-artifact@v7
+        with:
+          name: swagger-docs
+          path: docs/swagger

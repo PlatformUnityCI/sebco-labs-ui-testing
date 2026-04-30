@@ -1,0 +1,1 @@
+In this directory, you must place de .apk file(s) you want to use for running the tests, ensuring the file is named 'app.apk'
