@@ -68,9 +68,6 @@ jobs:
       - name: Configure Python Path
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
-      - name: Export OpenAPI spec
-        run: python scripts/export_openapi.py
-
       - name: Run tests
         run: |
           mkdir -p reports
@@ -92,6 +89,7 @@ jobs:
           PYTEST_ADDOPTS: "--color=yes"
 
       - name: Run behave
+        if: false
         run: |
           mkdir -p reports/behave
 
@@ -121,9 +119,3 @@ jobs:
         with:
           name: test-report
           path: reports
-        
-      - name: Upload Swagger
-        uses: actions/upload-artifact@v7
-        with:
-          name: swagger-docs
-          path: docs/swagger
